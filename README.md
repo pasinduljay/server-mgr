@@ -1,4 +1,4 @@
-# ServerMGR — Automated Server Management
+# ServerMGR - Automated Server Management
 
 <div align="center">
 
