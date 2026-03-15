@@ -901,18 +901,24 @@ install_odoo_docker() {
 
     # ── Domains
     echo
-    ask ODOO_DOMAIN    "Odoo domain"              "odoo.example.com"
-    ask TRAEFIK_DOMAIN "Traefik dashboard domain" "traefik.example.com"
+    ask ODOO_DOMAIN "Odoo domain" "odoo.example.com"
 
     # ── Install dir
     ask INSTALL_DIR "Installation directory" "$DEFAULT_INSTALL_DIR"
 
     # ── Traefik dashboard
     echo
+    print_line
     echo -e "  ${BWHITE}Traefik Dashboard:${RESET}"
     echo -e "  ${BCYAN}[1]${RESET}  Enable   ${BCYAN}[2]${RESET}  Disable"
-    ask DASH_CHOICE "Dashboard" "1"
-    if [[ "$DASH_CHOICE" == "2" ]]; then DASHBOARD_ENABLED="false"; else DASHBOARD_ENABLED="true"; fi
+    ask DASH_CHOICE "Dashboard" "2"
+    if [[ "$DASH_CHOICE" == "1" ]]; then
+        DASHBOARD_ENABLED="true"
+        ask TRAEFIK_DOMAIN "Traefik dashboard domain" "traefik.example.com"
+    else
+        DASHBOARD_ENABLED="false"
+        TRAEFIK_DOMAIN="dashboard.disabled"
+    fi
 
     # ── SSL Mode
     echo
