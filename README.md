@@ -24,10 +24,10 @@
 ## ⚡ Quick Start
 
 ```bash
-sudo bash <(curl -Ls https://raw.githubusercontent.com/pasinduljay/server-mgr/main/server-mgr.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/pasinduljay/server-mgr/main/server-mgr.sh)
 ```
 
-> **Requires root or sudo privileges.** The script will inform you if it's run without them.
+> **No `sudo` needed on the outside.** The script detects if it's not running as root and automatically re-elevates itself via `sudo`. You'll be prompted for your password once.
 
 ---
 

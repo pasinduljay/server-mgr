@@ -22,6 +22,9 @@ ODOO_DOCKER_REPO="https://github.com/pasinduljay/odoo-docker"
 # WORDPRESS_DOCKER_REPO="https://github.com/pasinduljay/wordpress-docker"
 # N8N_DOCKER_REPO="https://github.com/pasinduljay/n8n-docker"
 
+# Raw URL of THIS script (used for self-download when auto-elevating)
+SCRIPT_URL="https://raw.githubusercontent.com/pasinduljay/server-mgr/main/server-mgr.sh"
+
 DEFAULT_INSTALL_DIR="/opt/odoo"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -150,33 +153,46 @@ ASCIIART
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PRIVILEGE CHECK
+# PRIVILEGE CHECK + AUTO-ELEVATE
+# Why not "sudo bash <(curl ...)"?
+#   sudo drops the parent shell's file descriptors, so /dev/fd/63 (the process
+#   substitution fd) becomes inaccessible → "No such file or directory".
+# Fix: run as a normal user with  bash <(curl ...)  and let the script elevate
+#   itself by saving to /tmp and re-exec'ing under sudo from a real file.
 # ─────────────────────────────────────────────────────────────────────────────
 check_privileges() {
-    if [[ $EUID -eq 0 ]]; then
-        return 0
+    # Already root – nothing to do
+    [[ $EUID -eq 0 ]] && return 0
+
+    echo
+    echo -e "  ${BYELLOW}⚠${RESET}  ${BOLD}Root privileges required. Elevating with sudo…${RESET}"
+    echo
+
+    local SELF="${BASH_SOURCE[0]:-$0}"
+
+    # If we're running from a file descriptor (process substitution / pipe),
+    # BASH_SOURCE will be something like /dev/fd/63 or /proc/.../fd/X.
+    # We can't sudo a fd, so download ourselves to a real temp file first.
+    if [[ "$SELF" == /dev/fd/* || "$SELF" == /proc/*/fd/* || "$SELF" == /dev/stdin || ! -f "$SELF" ]]; then
+        local TMPSCRIPT
+        TMPSCRIPT=$(mktemp /tmp/server-mgr-XXXXXX.sh)
+        if command -v curl &>/dev/null; then
+            curl -fsSL "$SCRIPT_URL" -o "$TMPSCRIPT" 2>/dev/null
+        elif command -v wget &>/dev/null; then
+            wget -qO "$TMPSCRIPT" "$SCRIPT_URL" 2>/dev/null
+        else
+            echo -e "  ${BRED}✗${RESET}  Neither curl nor wget found. Cannot auto-elevate."
+            echo -e "       Please run:  ${BCYAN}sudo bash /path/to/server-mgr.sh${RESET}"
+            exit 1
+        fi
+        chmod 755 "$TMPSCRIPT"
+        exec sudo bash "$TMPSCRIPT"
+        exit $?
     fi
-    if sudo -n true 2>/dev/null; then
-        return 0
-    fi
-    clear_screen
-    echo
-    print_double_line
-    echo -e "  ${BRED}  ACCESS DENIED – Root or sudo privileges required  ${RESET}"
-    print_double_line
-    echo
-    echo -e "  This script must be run as ${BWHITE}root${RESET} or with ${BWHITE}sudo${RESET} access."
-    echo
-    echo -e "  ${BYELLOW}Option 1${RESET} – Run directly as root:"
-    echo -e "    ${BCYAN}sudo bash <(curl -Ls <script-url>)${RESET}"
-    echo
-    echo -e "  ${BYELLOW}Option 2${RESET} – Switch to root first:"
-    echo -e "    ${BCYAN}sudo -s${RESET}"
-    echo -e "    ${BCYAN}bash <(curl -Ls <script-url>)${RESET}"
-    echo
-    print_double_line
-    echo
-    exit 1
+
+    # Running from a real file – can exec sudo directly
+    exec sudo bash "$SELF"
+    exit $?
 }
 
 # Elevate all subsequent commands to root if running via sudo
