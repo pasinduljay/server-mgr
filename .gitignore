@@ -1,0 +1,30 @@
+# Odoo secrets
+app/odoo_pg_pass
+
+# Traefik certificates (user-provided, never commit)
+app/traefik/certs/origin-cert.pem
+app/traefik/certs/origin-key.pem
+
+# Let's Encrypt ACME storage
+app/traefik/acme/acme.json
+
+# Traefik logs
+app/traefik/logs/*.log
+
+# Database data volumes (if bind-mounted locally)
+app/database/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Editor
+.vscode/
+.idea/
+
+# Temp files
+*.tmp
+*.log
+/tmp/
