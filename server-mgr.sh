@@ -313,6 +313,30 @@ module_docker_fedora() {
 # ─────────────────────────────────────────────────────────────────────────────
 # ─── MODULE: USER MANAGEMENT ─────────────────────────────────────────────────
 # ─────────────────────────────────────────────────────────────────────────────
+
+# Shared helper – offer to add a user to the docker group
+_maybe_add_docker_group() {
+    local _u="$1"
+    if ! command -v docker &>/dev/null; then
+        info "Docker is not installed – skipping docker group option."
+        return
+    fi
+    echo
+    print_line
+    info "Docker is installed on this system."
+    info "Adding '${_u}' to the ${BOLD}docker${RESET} group lets them run Docker"
+    info "commands WITHOUT typing sudo/password every time."
+    warn "Note: docker group access is equivalent to root for Docker operations."
+    echo
+    if confirm "Add '${_u}' to the docker group?"; then
+        maybe_sudo usermod -aG docker "$_u"
+        ok "User '${_u}' added to docker group."
+        info "They must log out and back in (or run: ${BCYAN}newgrp docker${RESET}) for it to take effect."
+    else
+        info "Skipped. You can add later via: ${BCYAN}Odoo Management → Add User to Docker Group${RESET}"
+    fi
+}
+
 create_sudo_nopasswd_user() {
     print_banner
     echo -e "  ${BBLUE}▶  Create Privileged User${RESET}  ${DIM}(sudo without password)${RESET}"
@@ -342,6 +366,7 @@ create_sudo_nopasswd_user() {
     echo
     ok "User '${USERNAME}' configured with NOPASSWD sudo access."
     ok "Sudoers file: /etc/sudoers.d/${USERNAME}"
+    _maybe_add_docker_group "$USERNAME"
     pause
 }
 
@@ -368,6 +393,45 @@ create_standard_sudo_user() {
 
     echo
     ok "User '${USERNAME}' has sudo access (password required)."
+    info "Tip: add to docker group so they can run Docker without password."
+    _maybe_add_docker_group "$USERNAME"
+    pause
+}
+
+add_user_to_docker_group() {
+    print_banner
+    echo -e "  ${BBLUE}▶  Add User to Docker Group${RESET}"
+    print_line
+    echo
+    info "Users in the ${BOLD}docker${RESET} group can run Docker commands without sudo."
+    warn "This grants effective root access to Docker operations."
+    echo
+
+    if ! command -v docker &>/dev/null; then
+        err "Docker is not installed. Install Docker first."
+        pause; return
+    fi
+
+    ask USERNAME "Username to add to docker group"
+    if [[ -z "$USERNAME" ]]; then err "Username cannot be empty."; pause; return; fi
+
+    if ! id "$USERNAME" &>/dev/null; then
+        err "User '${USERNAME}' does not exist."
+        pause; return
+    fi
+
+    # Check if already in docker group
+    if id -nG "$USERNAME" | grep -qw docker; then
+        warn "User '${USERNAME}' is already in the docker group."
+        pause; return
+    fi
+
+    maybe_sudo usermod -aG docker "$USERNAME"
+    echo
+    ok "User '${USERNAME}' added to the docker group."
+    info "They must log out and back in (or run: ${BCYAN}newgrp docker${RESET}) for it to take effect."
+    echo
+    info "Verify with: ${BCYAN}groups ${USERNAME}${RESET}"
     pause
 }
 
@@ -1130,15 +1194,16 @@ menu_odoo() {
         echo -e "  ${BYELLOW}── User Management ──────────────────────────────────${RESET}"
         echo -e "  ${BCYAN}[1]${RESET}  Create Privileged User     ${DIM}(sudo without password)${RESET}"
         echo -e "  ${BCYAN}[2]${RESET}  Create Standard Sudo User  ${DIM}(sudo with password)${RESET}"
-        echo -e "  ${BCYAN}[3]${RESET}  Delete User"
+        echo -e "  ${BCYAN}[3]${RESET}  Add User to Docker Group"
+        echo -e "  ${BCYAN}[4]${RESET}  Delete User"
         echo
         echo -e "  ${BYELLOW}── Odoo Installation ────────────────────────────────${RESET}"
-        echo -e "  ${BCYAN}[4]${RESET}  Install Odoo  ${DIM}(Legacy / Bare-metal)${RESET}"
-        echo -e "  ${BCYAN}[5]${RESET}  Install Odoo  ${DIM}(Docker Stack – Wizard)${RESET}"
-        echo -e "  ${BCYAN}[6]${RESET}  Manage Existing Odoo Docker Stack"
+        echo -e "  ${BCYAN}[5]${RESET}  Install Odoo  ${DIM}(Legacy / Bare-metal)${RESET}"
+        echo -e "  ${BCYAN}[6]${RESET}  Install Odoo  ${DIM}(Docker Stack – Wizard)${RESET}"
+        echo -e "  ${BCYAN}[7]${RESET}  Manage Existing Odoo Docker Stack"
         echo
         echo -e "  ${BYELLOW}── System ───────────────────────────────────────────${RESET}"
-        echo -e "  ${BCYAN}[7]${RESET}  UFW Firewall"
+        echo -e "  ${BCYAN}[8]${RESET}  UFW Firewall"
         echo
         echo -e "  ${BCYAN}[0]${RESET}  ← Back to Main Menu"
         echo
@@ -1148,11 +1213,12 @@ menu_odoo() {
         case "$ODOO_CHOICE" in
             1) create_sudo_nopasswd_user ;;
             2) create_standard_sudo_user ;;
-            3) delete_user ;;
-            4) install_odoo_legacy ;;
-            5) install_odoo_docker ;;
-            6) manage_odoo_stack ;;
-            7) ufw_menu ;;
+            3) add_user_to_docker_group ;;
+            4) delete_user ;;
+            5) install_odoo_legacy ;;
+            6) install_odoo_docker ;;
+            7) manage_odoo_stack ;;
+            8) ufw_menu ;;
             0|"") break ;;
             *) warn "Invalid option. Please try again." ;;
         esac
